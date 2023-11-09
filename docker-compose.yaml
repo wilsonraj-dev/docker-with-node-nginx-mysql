@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:5.7
+    command: --innodb-use-native-aio=0
+    container_name: mysql
+    restart: always
+    tty: true
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/scripts:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_DATABASE=nodedb
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - node-network
+
+  node:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    container_name: node
+    entrypoint: dockerize -wait tcp://mysql:3306 -timeout 30s npm run start
+    tty: true
+    volumes:
+      - ./node:/usr/src/app
+    networks:
+      - node-network
+    depends_on:
+      - mysql
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    tty: true
+    ports:
+      - "8080:8080"
+    networks:
+      - node-network
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+    depends_on:
+      - node
+
+networks:
+  node-network:
+    driver: bridge      
